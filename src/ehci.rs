@@ -102,6 +102,7 @@ pub fn find_ehci_controller() -> Option<PciDevice> {
     None
 }
 
+use alloc::boxed::Box;
 use x86_64::{
     structures::paging::{FrameAllocator, Mapper, Page, PageTableFlags, PhysFrame}, PhysAddr, VirtAddr
 };
@@ -148,3 +149,11 @@ pub unsafe fn reset_ehci_controller(mmio_base: *mut u8) {
     }
     println!("EHCI controller reset complete.");
 }
+
+use x86_64::structures::paging::{ Size4KiB, OffsetPageTable};
+use crate::memory::{BootInfoFrameAllocator};
+
+const EHCI_USBCMD_OFFSET: usize = 0x20;
+const EHCI_USBSTS_OFFSET: usize = 0x24;
+const EHCI_PERIODICLISTBASE_OFFSET: usize = 0x18;
+

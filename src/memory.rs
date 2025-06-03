@@ -110,3 +110,13 @@ let phys_frame = PhysFrame::containing_address(PhysAddr::new(phys_addr.as_u64())
 
     Ok(start_page.start_address())
 }
+
+pub fn virt_to_phys(virt_addr: VirtAddr, physical_memory_offset: VirtAddr) -> Option<PhysAddr> {
+    if virt_addr >= physical_memory_offset {
+        // Safe to subtract because virt_addr >= physical_memory_offset
+        let phys_addr = virt_addr - physical_memory_offset;
+        Some(PhysAddr::new(phys_addr as u64))
+    } else {
+        None
+    }
+}
