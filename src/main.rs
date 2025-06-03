@@ -6,9 +6,13 @@
 
 extern crate alloc;
 
+use blog_os::ehci::{find_ehci_controller, reset_ehci_controller};
+use blog_os::memory::map_mmio_region;
+use blog_os::pci::init_pci;
 use blog_os::println;
 use blog_os::task::{Task, executor::Executor, keyboard};
 use bootloader::{BootInfo, entry_point};
+use x86_64::PhysAddr;
 use core::panic::PanicInfo;
 
 entry_point!(kernel_main);
@@ -26,6 +30,13 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     let mut frame_allocator = unsafe { BootInfoFrameAllocator::init(&boot_info.memory_map) };
 
     allocator::init_heap(&mut mapper, &mut frame_allocator).expect("heap initialization failed");
+
+    if let Some(ehci) = find_ehci_controller() {
+        init_pci(ehci, frame_allocator, mapper);
+    } else {
+        println!("No EHCI Controller found.");
+    }
+
 
     #[cfg(test)]
     test_main();

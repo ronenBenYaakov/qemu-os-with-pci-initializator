@@ -1,0 +1,13 @@
+✅ [PCI Init] -> Find EHCI -> Map MMIO -> Reset Controller
+   |
+[USB Frame Schedule] -> Enable Periodic List + Async List
+   |
+[Port Status Change] -> Detect device insertion
+   |
+[Control Transfer] -> Read Device Descriptor (GET_DESCRIPTOR)
+   |
+[Set Address] -> Assign USB address
+   |
+[Get Configs] -> Parse interfaces and endpoints
+   |
+[Driver Binding] -> Bind keyboard/storage/etc driver

@@ -84,3 +84,29 @@ unsafe impl FrameAllocator<Size4KiB> for BootInfoFrameAllocator {
         frame
     }
 }
+
+const EHCI_MMIO_VADDR: u64 = 0xFE00_0000;
+
+use x86_64::{
+    structures::paging::{Page, PageTableFlags, Mapper}
+};
+
+pub fn map_mmio_region(
+    phys_addr: PhysAddr,
+    mapper: &mut impl Mapper<Size4KiB>,
+    frame_allocator: &mut impl FrameAllocator<Size4KiB>,
+) -> Result<VirtAddr, &'static str> {
+    let start_page = Page::containing_address(VirtAddr::new(EHCI_MMIO_VADDR));
+let phys_frame = PhysFrame::containing_address(PhysAddr::new(phys_addr.as_u64()));
+    let flags = PageTableFlags::PRESENT | PageTableFlags::WRITABLE | PageTableFlags::NO_CACHE;
+
+    // map one 4KiB page
+    unsafe {
+        mapper
+            .map_to(start_page, phys_frame, flags, frame_allocator)
+            .map_err(|_| "map_to failed")?
+            .flush();
+    }
+
+    Ok(start_page.start_address())
+}

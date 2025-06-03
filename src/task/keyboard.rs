@@ -14,12 +14,9 @@ use pc_keyboard::{DecodedKey, HandleControl, Keyboard, ScancodeSet1, layouts};
 static SCANCODE_QUEUE: OnceCell<ArrayQueue<u8>> = OnceCell::uninit();
 static WAKER: AtomicWaker = AtomicWaker::new();
 
-/// Called by the keyboard interrupt handler
-///
-/// Must not block or allocate.
 pub(crate) fn add_scancode(scancode: u8) {
     if let Ok(queue) = SCANCODE_QUEUE.try_get() {
-        if let Err(_) = queue.push(scancode) {
+        if queue.push(scancode).is_err() {
             println!("WARNING: scancode queue full; dropping keyboard input");
         } else {
             WAKER.wake();
@@ -46,11 +43,8 @@ impl Stream for ScancodeStream {
     type Item = u8;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Option<u8>> {
-        let queue = SCANCODE_QUEUE
-            .try_get()
-            .expect("scancode queue not initialized");
+        let queue = SCANCODE_QUEUE.try_get().expect("scancode queue not initialized");
 
-        // fast path
         if let Some(scancode) = queue.pop() {
             return Poll::Ready(Some(scancode));
         }
@@ -74,12 +68,48 @@ pub async fn print_keypresses() {
         HandleControl::Ignore,
     );
 
+    use alloc::vec::Vec;
+
+    let mut buffer = Vec::with_capacity(1024);
+    print!("> "); // Initial prompt
+
     while let Some(scancode) = scancodes.next().await {
         if let Ok(Some(key_event)) = keyboard.add_byte(scancode) {
             if let Some(key) = keyboard.process_keyevent(key_event) {
                 match key {
-                    DecodedKey::Unicode(character) => print!("{}", character),
-                    DecodedKey::RawKey(key) => print!("{:?}", key),
+                    DecodedKey::Unicode(c) => {
+                        match c {
+                            '\n' => {
+                                println!();
+                                if let Ok(input_str) = core::str::from_utf8(&buffer) {
+                                    println!("You typed: {}", input_str);
+                                } else {
+                                    println!("[Invalid UTF-8 input]");
+                                }
+                                buffer.clear();
+                                print!("> ");
+                            }
+                            '\x08' => { // Backspace
+                                if !buffer.is_empty() {
+                                    buffer.pop();
+                                    // Move cursor back, erase char, move cursor back
+                                    print!("\u{8} \u{8}");
+                                }
+                            }
+                            c if !c.is_control() => {
+                                if buffer.len() < 1024 {
+                                    buffer.push(c as u8);
+                                    print!("{}", c);
+                                }
+                            }
+                            _ => {
+                                // Ignore other control chars
+                            }
+                        }
+                    }
+                    DecodedKey::RawKey(_) => {
+                        // Don't print raw keys at all
+                    }
                 }
             }
         }
